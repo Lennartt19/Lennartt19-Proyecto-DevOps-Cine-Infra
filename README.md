@@ -14,13 +14,13 @@ GitHub (este repo, main) ──terraform.yml──▶ Azure (sub b497fd69-… "A
   push main ──▶ apply dev (auto, único automático)
   dispatch manual ──▶ apply shared / qa / prod (tu elección; shared y prod con aprobador)
 
-  rg-parkyfilms                       rg-parkyfilms-tfstate (bootstrap)
-  ├── acrparkyfilms (ACR Basic)        └── stparkyfilmstf/tfstate/
-  ├── aks-parkyfilms (1 cluster)           shared|dev|qa|prod.tfstate
-  │    ├── parky-dev  (quota 4cpu/8Gi)
-  │    ├── parky-qa   (quota 4cpu/8Gi)
-  │    └── parky-prod (quota 6cpu/12Gi)
-  └── id-parkyfilms-{dev,qa,prod} (OIDC por entorno, sin secretos)
+  rg-parkyfilms (LO CREA Terraform)   rg-parkyfilms-tfstate (bootstrap)
+  ├── acrparkyfilms (ACR Basic)        ├── stparkyfilmstf/tfstate/
+  ├── aks-parkyfilms (1 cluster)       │    shared|dev|qa|prod.tfstate
+  │    ├── parky-dev  (quota 4cpu/8Gi) └── id-parkyfilms-{dev,qa,prod}
+  │    ├── parky-qa   (quota 4cpu/8Gi)      (OIDC por entorno, sin secretos,
+  │    └── parky-prod (quota 6cpu/12Gi)     rol Contributor a nivel suscripción:
+  │                                         Terraform crea el RG de trabajo)
 ```
 
 Auth 100% OIDC federado: subjects
@@ -31,11 +31,14 @@ Auth 100% OIDC federado: subjects
 
 1. **Crear el repo en GitHub** con este contenido + Environments
    `azure-dev`, `azure-qa`, `azure-prod` (`azure-prod` con revisor obligatorio).
-2. **Bootstrap (una vez, crea gasto real)**:
-   `./scripts/bootstrap.sh <OWNER> <REPO_INFRA>` → imprime los `ARM_*`
-   por entorno. Cargar en cada Environment:
+2. **Bootstrap (una vez, crea gasto mínimo: solo Storage)**:
+   `./scripts/bootstrap.sh <OWNER> <REPO_INFRA>` → Storage de states +
+   3 identities OIDC con Contributor a nivel suscripción (necesario porque
+   Terraform creará el RG de trabajo). Imprime los `ARM_*` por entorno.
+   Cargar en cada Environment:
    `ARM_CLIENT_ID`, `ARM_TENANT_ID`, `ARM_SUBSCRIPTION_ID` +
    `TF_VAR_postgres_password`, `TF_VAR_jwt_secret`, `TF_VAR_session_secret`.
+   Nada de RGs de trabajo existe aún: los crea el paso 5.
 3. **Abrir PR** → `terraform plan` automático de los 4 roots.
 4. **Merge a main** → apply `dev` (único automático).
 5. **Dispatch manual (tu elección)** → `shared` (primera vez: crea ACR+AKS,

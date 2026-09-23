@@ -1,0 +1,6 @@
+# Valores NO secretos del entorno. Copiar a terraform.tfvars para uso local.
+# Secretos (postgres_password, jwt_secret, session_secret) SOLO por TF_VAR_*
+# en local o GitHub Environments en CI. NUNCA commitear el .tfvars real.
+subscription_id     = "b497fd69-266c-46a9-b55b-8be0cd579667"
+resource_group_name = "rg-parkyfilms"
+cluster_name        = "aks-parkyfilms"

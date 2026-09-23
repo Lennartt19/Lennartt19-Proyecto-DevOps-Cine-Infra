@@ -21,5 +21,6 @@ output "aks_oidc_issuer_url" {
 }
 
 output "resource_group_name" {
-  value = data.azurerm_resource_group.main.name
+  description = "RG creado por este módulo (los roots dev/qa/prod lo usan como default)."
+  value       = azurerm_resource_group.main.name
 }

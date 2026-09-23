@@ -12,9 +12,15 @@ variable "subscription_id" {
 }
 
 variable "resource_group_name" {
-  description = "RG existente creado por scripts/bootstrap.sh (no se crea aquí)."
+  description = "RG de trabajo. LO CREA el apply de shared (no existe antes)."
   type        = string
   default     = "rg-parkyfilms"
+}
+
+variable "location" {
+  description = "Región Azure del RG y recursos. Debe coincidir con el bootstrap."
+  type        = string
+  default     = "chilecentral"
 }
 
 variable "acr_name" {

@@ -1,14 +1,14 @@
 # Módulo platform: infraestructura COMPARTIDA (1 por suscripción).
-# El Resource Group ya existe (lo crea scripts/bootstrap.sh) y se referencia
-# por nombre. Crea: ACR + AKS + rol AcrPull para el kubelet.
+# Crea: Resource Group + ACR + AKS + rol AcrPull para el kubelet.
+# Nada existe en la nube antes del primer apply del root shared.
 
 variable "resource_group_name" {
-  description = "RG existente (bootstrap). No se crea aquí."
+  description = "RG de trabajo. LO CREA Terraform en el apply de shared."
   type        = string
 }
 
 variable "location" {
-  description = "Región Azure, ej. chilecentral"
+  description = "Región Azure del RG (y de ACR/AKS). Ej. chilecentral"
   type        = string
 }
 

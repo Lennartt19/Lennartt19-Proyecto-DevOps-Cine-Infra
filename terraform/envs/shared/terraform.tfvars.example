@@ -1,0 +1,9 @@
+# Valores NO secretos del root shared. Copiar a terraform.tfvars para uso local.
+# (En CI llegan por TF_VAR_* desde GitHub Environments.)
+subscription_id     = "b497fd69-266c-46a9-b55b-8be0cd579667"
+resource_group_name = "rg-parkyfilms"
+location            = "chilecentral"
+acr_name            = "acrparkyfilms"
+aks_name            = "aks-parkyfilms"
+node_count          = 2
+vm_size             = "Standard_B2s"

@@ -30,10 +30,12 @@ destroy_root prod
 destroy_root qa
 destroy_root dev
 
-confirm "¿Destruir infraestructura compartida ACR+AKS (terraform)?"
+confirm "¿Destruir infraestructura compartida RG+ACR+AKS (terraform)?"
 destroy_root shared
 
+# El destroy de shared ya borra rg-parkyfilms (gestionado por Terraform);
+# esto solo cubre restos si el destroy falló a medias.
 confirm "¿Borrar los resource groups rg-parkyfilms y $TF_STATE_RG (pierdes states)?"
-az group delete --name rg-parkyfilms --yes --no-wait
+az group delete --name rg-parkyfilms --yes --no-wait 2>/dev/null || echo "rg-parkyfilms ya no existe (lo borró Terraform)."
 az group delete --name "$TF_STATE_RG" --yes --no-wait
 echo "Limpieza lanzada."
