@@ -11,8 +11,8 @@ Terraform (1 AKS compartido + namespaces dev/qa/prod), pipelines de
 ```
 GitHub (este repo, main) ──terraform.yml──▶ Azure (sub b497fd69-… "AZURE 02")
   PR ──▶ plan shared/dev/qa/prod (comenta diff)
-  push main ──▶ apply dev + qa (auto)
-  dispatch manual ──▶ apply shared / prod (con aprobador)
+  push main ──▶ apply dev (auto, único automático)
+  dispatch manual ──▶ apply shared / qa / prod (tu elección; shared y prod con aprobador)
 
   rg-parkyfilms                       rg-parkyfilms-tfstate (bootstrap)
   ├── acrparkyfilms (ACR Basic)        └── stparkyfilmstf/tfstate/
@@ -37,9 +37,10 @@ Auth 100% OIDC federado: subjects
    `ARM_CLIENT_ID`, `ARM_TENANT_ID`, `ARM_SUBSCRIPTION_ID` +
    `TF_VAR_postgres_password`, `TF_VAR_jwt_secret`, `TF_VAR_session_secret`.
 3. **Abrir PR** → `terraform plan` automático de los 4 roots.
-4. **Merge a main** → apply `dev` + `qa`.
-5. **Dispatch manual** → apply `shared` (primera vez: crea ACR+AKS, ~10 min)
-   y luego `prod`.
+4. **Merge a main** → apply `dev` (único automático).
+5. **Dispatch manual (tu elección)** → `shared` (primera vez: crea ACR+AKS,
+   ~10 min, con aprobador), luego `qa` y `prod` cuando tú decidas
+   (`prod` también con aprobador).
 
 ## Uso local
 

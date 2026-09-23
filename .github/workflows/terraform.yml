@@ -1,5 +1,5 @@
-# Terraform: plan en PR, apply dev+qa en main, prod/shared manual.
-# Auth OIDC sin secretos: cada job usa su GitHub Environment
+# Terraform: plan en PR, apply DEV auto en main, qa/prod/shared SOLO manual.
+# Cada entorno aislado: eliges el target en el dispatch y corre con SU identidad
 # (azure-dev / azure-qa / azure-prod) con ARM_CLIENT_ID/_TENANT_ID/_SUBSCRIPTION_ID
 # + secretos de app (TF_VAR_postgres_password, TF_VAR_jwt_secret, TF_VAR_session_secret).
 name: terraform
@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: 'Root a aplicar (shared y prod SOLO manual)'
+        description: 'Entorno a levantar (tu elección manual)'
         required: true
         type: choice
         options: [shared, dev, qa, prod]
@@ -71,20 +71,13 @@ jobs:
           TF_VAR_session_secret: ${{ secrets.TF_VAR_session_secret }}
         run: terraform plan -input=false -out=tfplan
 
-  apply-dev-qa:
+  apply-dev:
     if: github.event_name == 'push'
-    strategy:
-      matrix:
-        include:
-          - root: dev
-            environment: azure-dev
-          - root: qa
-            environment: azure-qa
     runs-on: ubuntu-latest
-    environment: ${{ matrix.environment }}
+    environment: azure-dev # dev es el único entorno con apply automático
     defaults:
       run:
-        working-directory: terraform/envs/${{ matrix.root }}
+        working-directory: terraform/envs/dev
     steps:
       - uses: actions/checkout@v4
 
@@ -103,7 +96,7 @@ jobs:
           -backend-config="resource_group_name=${{ env.TF_STATE_RG }}"
           -backend-config="storage_account_name=${{ env.TF_STATE_ST }}"
           -backend-config="container_name=${{ env.TF_STATE_CONTAINER }}"
-          -backend-config="key=${{ matrix.root }}.tfstate"
+          -backend-config="key=dev.tfstate"
 
       - name: Apply
         env:
@@ -116,7 +109,8 @@ jobs:
   apply-manual:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    environment: azure-prod # shared y prod exigen aprobador en este environment
+    # shared y prod corren con azure-prod (exige aprobador); dev/qa con su environment propio.
+    environment: ${{ inputs.target == 'shared' && 'azure-prod' || format('azure-{0}', inputs.target) }}
     defaults:
       run:
         working-directory: terraform/envs/${{ inputs.target }}
