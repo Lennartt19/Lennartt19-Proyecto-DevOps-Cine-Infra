@@ -1,0 +1,149 @@
+# Terraform: plan en PR, apply dev+qa en main, prod/shared manual.
+# Auth OIDC sin secretos: cada job usa su GitHub Environment
+# (azure-dev / azure-qa / azure-prod) con ARM_CLIENT_ID/_TENANT_ID/_SUBSCRIPTION_ID
+# + secretos de app (TF_VAR_postgres_password, TF_VAR_jwt_secret, TF_VAR_session_secret).
+name: terraform
+
+on:
+  pull_request:
+    paths: ['terraform/**', '.github/workflows/terraform.yml']
+  push:
+    branches: [main]
+    paths: ['terraform/**', '.github/workflows/terraform.yml']
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Root a aplicar (shared y prod SOLO manual)'
+        required: true
+        type: choice
+        options: [shared, dev, qa, prod]
+
+permissions:
+  id-token: write # OIDC
+  contents: read
+  pull-requests: write # comentar el plan en el PR
+
+env:
+  TF_STATE_RG: rg-parkyfilms-tfstate
+  TF_STATE_ST: stparkyfilmstf
+  TF_STATE_CONTAINER: tfstate
+  TF_IN_AUTOMATION: true
+
+jobs:
+  plan:
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    strategy:
+      matrix:
+        root: [shared, dev, qa, prod]
+    runs-on: ubuntu-latest
+    environment: azure-dev # los planes usan la identidad dev (solo lectura efectiva del plan)
+    defaults:
+      run:
+        working-directory: terraform/envs/${{ matrix.root }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login Azure (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.ARM_CLIENT_ID }}
+          tenant-id: ${{ secrets.ARM_TENANT_ID }}
+          subscription-id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Init (backend remoto)
+        run: >
+          terraform init
+          -backend-config="resource_group_name=${{ env.TF_STATE_RG }}"
+          -backend-config="storage_account_name=${{ env.TF_STATE_ST }}"
+          -backend-config="container_name=${{ env.TF_STATE_CONTAINER }}"
+          -backend-config="key=${{ matrix.root }}.tfstate"
+
+      - name: Validate
+        run: terraform validate
+
+      - name: Plan
+        env:
+          TF_VAR_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+          TF_VAR_postgres_password: ${{ secrets.TF_VAR_postgres_password }}
+          TF_VAR_jwt_secret: ${{ secrets.TF_VAR_jwt_secret }}
+          TF_VAR_session_secret: ${{ secrets.TF_VAR_session_secret }}
+        run: terraform plan -input=false -out=tfplan
+
+  apply-dev-qa:
+    if: github.event_name == 'push'
+    strategy:
+      matrix:
+        include:
+          - root: dev
+            environment: azure-dev
+          - root: qa
+            environment: azure-qa
+    runs-on: ubuntu-latest
+    environment: ${{ matrix.environment }}
+    defaults:
+      run:
+        working-directory: terraform/envs/${{ matrix.root }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login Azure (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.ARM_CLIENT_ID }}
+          tenant-id: ${{ secrets.ARM_TENANT_ID }}
+          subscription-id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Init (backend remoto)
+        run: >
+          terraform init
+          -backend-config="resource_group_name=${{ env.TF_STATE_RG }}"
+          -backend-config="storage_account_name=${{ env.TF_STATE_ST }}"
+          -backend-config="container_name=${{ env.TF_STATE_CONTAINER }}"
+          -backend-config="key=${{ matrix.root }}.tfstate"
+
+      - name: Apply
+        env:
+          TF_VAR_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+          TF_VAR_postgres_password: ${{ secrets.TF_VAR_postgres_password }}
+          TF_VAR_jwt_secret: ${{ secrets.TF_VAR_jwt_secret }}
+          TF_VAR_session_secret: ${{ secrets.TF_VAR_session_secret }}
+        run: terraform apply -input=false -auto-approve
+
+  apply-manual:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: azure-prod # shared y prod exigen aprobador en este environment
+    defaults:
+      run:
+        working-directory: terraform/envs/${{ inputs.target }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login Azure (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.ARM_CLIENT_ID }}
+          tenant-id: ${{ secrets.ARM_TENANT_ID }}
+          subscription-id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Init (backend remoto)
+        run: >
+          terraform init
+          -backend-config="resource_group_name=${{ env.TF_STATE_RG }}"
+          -backend-config="storage_account_name=${{ env.TF_STATE_ST }}"
+          -backend-config="container_name=${{ env.TF_STATE_CONTAINER }}"
+          -backend-config="key=${{ inputs.target }}.tfstate"
+
+      - name: Apply
+        env:
+          TF_VAR_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+          TF_VAR_postgres_password: ${{ secrets.TF_VAR_postgres_password }}
+          TF_VAR_jwt_secret: ${{ secrets.TF_VAR_jwt_secret }}
+          TF_VAR_session_secret: ${{ secrets.TF_VAR_session_secret }}
+        run: terraform apply -input=false -auto-approve
